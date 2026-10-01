@@ -237,8 +237,8 @@ class MagiaV3Tile(gvsoc.systree.Component):
         # and a single stream per channel, and the sixteen entries per multireg that iDMA v0.6.4
         # generates. The direction needs no parameter: the backend picks TCDM or AXI from the
         # address, so a channel simply never sees the other direction.
-        idma0 = Reg32_3dDma(self,f'tile-{tid}-idma0',nb_cores=1,nb_pe_ports=0,nb_streams=1,multireg_count=16,loc_base=(tid*MagiaArch.L1_TILE_OFFSET),loc_size=MagiaArch.L1_SIZE,tcdm_width=32,transfer_queue_size=1,burst_queue_size=MagiaDSE.TILE_IDMA0_BQUEUE_SIZE,burst_size=MagiaDSE.TILE_IDMA0_B_SIZE)
-        idma1 = Reg32_3dDma(self,f'tile-{tid}-idma1',nb_cores=1,nb_pe_ports=0,nb_streams=1,multireg_count=16,loc_base=(tid*MagiaArch.L1_TILE_OFFSET),loc_size=MagiaArch.L1_SIZE,tcdm_width=32,transfer_queue_size=1,burst_queue_size=MagiaDSE.TILE_IDMA1_BQUEUE_SIZE,burst_size=MagiaDSE.TILE_IDMA1_B_SIZE)
+        idma0 = Reg32_3dDma(self,f'tile-{tid}-idma0',nb_cores=1,nb_pe_ports=0,nb_streams=1,multireg_count=16,global_queue_depth=MagiaDSE.TILE_IDMA_GLOBAL_QUEUE_SIZE,loc_base=(tid*MagiaArch.L1_TILE_OFFSET),loc_size=MagiaArch.L1_SIZE,tcdm_width=32,transfer_queue_size=MagiaDSE.TILE_IDMA_TRANSFER_QUEUE_SIZE,burst_queue_size=MagiaDSE.TILE_IDMA0_BQUEUE_SIZE,burst_size=MagiaDSE.TILE_IDMA0_B_SIZE)
+        idma1 = Reg32_3dDma(self,f'tile-{tid}-idma1',nb_cores=1,nb_pe_ports=0,nb_streams=1,multireg_count=16,global_queue_depth=MagiaDSE.TILE_IDMA_GLOBAL_QUEUE_SIZE,loc_base=(tid*MagiaArch.L1_TILE_OFFSET),loc_size=MagiaArch.L1_SIZE,tcdm_width=32,transfer_queue_size=MagiaDSE.TILE_IDMA_TRANSFER_QUEUE_SIZE,burst_queue_size=MagiaDSE.TILE_IDMA1_BQUEUE_SIZE,burst_size=MagiaDSE.TILE_IDMA1_B_SIZE)
         # Redmule
         redmule = LightRedmule(self, f'tile-{tid}-redmule',
                                     tcdm_bank_width     = MagiaArch.BYTES_PER_WORD,

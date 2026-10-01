@@ -161,8 +161,8 @@ class MagiaV3Soc(gvsoc.systree.Component):
                                     name='magia-noc',
                                     narrow_width=4,
                                     wide_width=32,
-                                    ni_outstanding_reqs=8, #need to double check this with RTL
-                                    router_input_queue_size=4, #need to double check this with RTL
+                                    ni_outstanding_reqs=MagiaDSE.SOC_NOC_NI_OUTSTANDING_REQS,
+                                    router_input_queue_size=MagiaDSE.SOC_NOC_ROUTER_INPUT_QUEUE_SIZE,
                                     dim_x=tree.n_tiles_x+1, dim_y=tree.n_tiles_y)
         
 

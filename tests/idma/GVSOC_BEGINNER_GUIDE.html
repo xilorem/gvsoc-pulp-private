@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The GVSOC reg32_3d iDMA Model and Its Regression Test</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --paper: #f6f3eb;
+      --surface: #fffdf8;
+      --ink: #20231f;
+      --muted: #62675f;
+      --line: #d9d5ca;
+      --accent: #006b5f;
+      --accent-soft: #dff2ed;
+      --blue: #245a9a;
+      --blue-soft: #e4eef9;
+      --orange: #a44813;
+      --orange-soft: #fbe9dc;
+      --red: #a72c2c;
+      --red-soft: #fae6e3;
+      --code: #17211f;
+      --code-ink: #eaf3ef;
+      --shadow: 0 12px 34px rgba(37, 43, 37, .08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --paper: #161a18;
+        --surface: #202522;
+        --ink: #edf1ec;
+        --muted: #b4bcb5;
+        --line: #39403b;
+        --accent: #71d4c2;
+        --accent-soft: #183a34;
+        --blue: #8cbcf2;
+        --blue-soft: #1e3349;
+        --orange: #f4a36f;
+        --orange-soft: #4b2d1f;
+        --red: #ff9990;
+        --red-soft: #492825;
+        --code: #0d1210;
+        --code-ink: #e8f1ed;
+        --shadow: 0 12px 34px rgba(0, 0, 0, .22);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font: 17px/1.68 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    a { color: var(--accent); text-underline-offset: .18em; }
+    code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    code { font-size: .9em; }
+    p code, li code, td code {
+      padding: .12em .34em;
+      border: 1px solid var(--line);
+      border-radius: .3em;
+      background: color-mix(in srgb, var(--surface) 70%, var(--accent-soft));
+    }
+    pre {
+      margin: 1.2rem 0;
+      padding: 1.1rem 1.25rem;
+      overflow: auto;
+      border-radius: .65rem;
+      background: var(--code);
+      color: var(--code-ink);
+      font-size: .84rem;
+      line-height: 1.55;
+      tab-size: 4;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.07);
+    }
+    pre code { font-size: inherit; }
+    h1, h2, h3, h4 { line-height: 1.18; letter-spacing: -.025em; }
+    h2 { margin: 3.7rem 0 1rem; font-size: clamp(1.8rem, 4vw, 2.55rem); }
+    h3 { margin: 2.5rem 0 .65rem; font-size: 1.42rem; }
+    h4 { margin: 1.7rem 0 .45rem; font-size: 1.08rem; }
+    p { margin: .75rem 0 1rem; }
+    ul, ol { padding-left: 1.3rem; }
+    li { margin: .35rem 0; }
+    table { width: 100%; border-collapse: collapse; margin: 1.2rem 0; font-size: .94rem; }
+    th, td { padding: .7rem .75rem; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { background: var(--accent-soft); }
+
+    .hero {
+      padding: 5.5rem max(1.4rem, calc((100vw - 1120px) / 2)) 4.5rem;
+      background:
+        radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--blue-soft) 75%, transparent), transparent 29rem),
+        linear-gradient(145deg, var(--surface), var(--accent-soft));
+      border-bottom: 1px solid var(--line);
+    }
+    .hero-inner { max-width: 850px; }
+    .eyebrow { color: var(--accent); font-weight: 750; letter-spacing: .09em; text-transform: uppercase; font-size: .78rem; }
+    h1 { max-width: 820px; margin: .65rem 0 1rem; font-size: clamp(2.55rem, 7vw, 5rem); }
+    .lede { max-width: 760px; color: var(--muted); font-size: clamp(1.08rem, 2.2vw, 1.35rem); }
+    .meta { margin-top: 1.5rem; color: var(--muted); font-size: .9rem; }
+
+    .layout { max-width: 1120px; margin: 0 auto; padding: 0 1.4rem 6rem; display: grid; grid-template-columns: 245px minmax(0, 780px); gap: 4rem; }
+    nav { position: sticky; top: 1rem; align-self: start; margin-top: 3rem; padding: 1.1rem; border: 1px solid var(--line); border-radius: .75rem; background: var(--surface); box-shadow: var(--shadow); font-size: .88rem; }
+    nav strong { display: block; margin-bottom: .55rem; }
+    nav ol { margin: 0; padding-left: 1.15rem; }
+    nav li { margin: .34rem 0; }
+    main { min-width: 0; }
+
+    .card, .callout { margin: 1.4rem 0; padding: 1rem 1.15rem; border-radius: .7rem; border: 1px solid var(--line); background: var(--surface); }
+    .callout { border-left: .35rem solid var(--accent); }
+    .callout.warning { border-left-color: var(--orange); background: var(--orange-soft); }
+    .callout.failure { border-left-color: var(--red); background: var(--red-soft); }
+    .callout.blue { border-left-color: var(--blue); background: var(--blue-soft); }
+    .callout > :first-child { margin-top: 0; }
+    .callout > :last-child { margin-bottom: 0; }
+    .label { display: inline-block; margin-right: .45rem; color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: .06em; font-size: .72rem; }
+
+    .flow { display: flex; align-items: stretch; gap: .5rem; margin: 1.4rem 0; overflow-x: auto; padding-bottom: .35rem; }
+    .flow .box { min-width: 130px; flex: 1; padding: .85rem; border: 1px solid var(--line); border-radius: .55rem; background: var(--surface); text-align: center; }
+    .flow .arrow { align-self: center; color: var(--accent); font-size: 1.4rem; font-weight: bold; }
+    .box strong { display: block; }
+    .box small { color: var(--muted); }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .caption { margin-top: -.7rem; color: var(--muted); font-size: .86rem; }
+    .path { overflow-wrap: anywhere; }
+    .checklist li::marker { color: var(--accent); }
+    .footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .9rem; }
+
+    @media (max-width: 860px) {
+      .layout { display: block; }
+      nav { position: static; }
+      .two-col { grid-template-columns: 1fr; }
+    }
+    @media print {
+      nav { display: none; }
+      .layout { display: block; max-width: 850px; }
+      .hero { padding: 2rem; }
+      pre { white-space: pre-wrap; }
+      h2, h3 { break-after: avoid; }
+      .card, .callout, pre { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero-inner">
+      <div class="eyebrow">A model-first beginner's guide</div>
+      <h1>The GVSOC iDMA model, from register write to completion</h1>
+      <p class="lede">A guided tour of the actual <code>Reg32_3dDma</code> implementation in this checkout, followed by a line-by-line explanation of the AXI response-reordering regression that exposes its burst-accounting bug.</p>
+      <p class="meta">Written for this checkout · September 2026 · No previous simulator experience assumed</p>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav aria-label="Table of contents">
+      <strong>Contents</strong>
+      <ol>
+        <li><a href="#big-picture">The big picture</a></li>
+        <li><a href="#model">The actual iDMA model</a></li>
+        <li><a href="#journey">One transfer's journey</a></li>
+        <li><a href="#bug">The bookkeeping bug</a></li>
+        <li><a href="#vocabulary">GVSOC vocabulary</a></li>
+        <li><a href="#python">Python system tree</a></li>
+        <li><a href="#cpp">C++ component model</a></li>
+        <li><a href="#interfaces">Ports and interfaces</a></li>
+        <li><a href="#time">Time, clocks, and reset</a></li>
+        <li><a href="#io">IO requests</a></li>
+        <li><a href="#target-runner">Targets and gvrun</a></li>
+        <li><a href="#tests">Test anatomy</a></li>
+        <li><a href="#idma">Regression walkthrough</a></li>
+        <li><a href="#gvtest">gvtest and workflow</a></li>
+        <li><a href="#debugging">Debugging and glossary</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section id="big-picture">
+        <h2>1. The big picture</h2>
+        <p>GVSOC is a virtual platform: software models stand in for hardware blocks, and a discrete-event engine decides when their actions happen. A component might model a processor, memory, interconnect, DMA, UART, or a testbench pretending to be the hardware around the device under test.</p>
+        <p>The first concept to lock in is that a typical GVSOC model has <strong>two halves</strong>:</p>
+
+        <div class="two-col">
+          <div class="card">
+            <span class="label">Python</span>
+            <strong>Structure and configuration</strong>
+            <p>Creates instances, gives them parameters, exposes ports, and binds the components into a system. Think “schematic plus build description.”</p>
+          </div>
+          <div class="card">
+            <span class="label">C++</span>
+            <strong>Runtime behavior</strong>
+            <p>Receives requests, changes state, schedules future work, produces responses, and decides when a test finishes. Think “what this block does over simulated time.”</p>
+          </div>
+        </div>
+
+        <div class="callout">
+          <p><strong>The shortest useful mental model:</strong> Python builds a graph. C++ runs the graph. Interfaces are the graph's edges. The simulation engine orders events in virtual time.</p>
+        </div>
+
+        <h3>From source files to a running simulation</h3>
+        <div class="flow" aria-label="GVSOC lifecycle">
+          <div class="box"><strong>Python target</strong><small>constructs the tree</small></div>
+          <div class="arrow">→</div>
+          <div class="box"><strong>Generated config</strong><small>components, properties, bindings</small></div>
+          <div class="arrow">→</div>
+          <div class="box"><strong>Build</strong><small>engine + model shared libraries</small></div>
+          <div class="arrow">→</div>
+          <div class="box"><strong>Run</strong><small>C++ callbacks and events</small></div>
+          <div class="arrow">→</div>
+          <div class="box"><strong>Exit status</strong><small>pass or fail</small></div>
+        </div>
+
+        <p>The engine itself is generic. The target tells it which system to instantiate. Compiled C++ models are loaded as shared libraries, and their Python descriptions tell GVSOC how to configure and connect them.</p>
+      </section>
+
+      <section id="model">
+        <h2>2. The actual <code>Reg32_3dDma</code> model</h2>
+        <p>The model discussed here is not the newer <code>idma_v2</code> model. It is the legacy, IO-v1, register-programmed model whose Python entry point is <code>pulp/idma/reg32_3d_dma.py</code>. Its C++ top is <code>pulp/idma/reg32_3d_dma.cpp</code>.</p>
+
+        <h3>What the Python wrapper builds</h3>
+        <p><code>Reg32_3dDma</code> compiles six C++ implementation files into one loadable GVSOC component:</p>
+        <pre><code>self.add_sources([
+    'pulp/idma/reg32_3d_dma.cpp',       # top-level composition
+    'pulp/idma/fe/idma_fe_reg32_3d.cpp',# register front end
+    'pulp/idma/me/idma_me_3d.cpp',      # 1D/2D/3D decomposition
+    'pulp/idma/be/idma_be.cpp',         # generic data mover
+    'pulp/idma/be/idma_be_axi.cpp',     # external-memory protocol
+    'pulp/idma/be/idma_be_tcdm.cpp',    # local-memory protocol
+])</code></pre>
+
+        <p>These are not six separately bound system-tree components. They are cooperating C++ <code>vp::Block</code> objects inside one <code>vp::Component</code>. The top constructor gives each layer direct C++ pointers to the next and previous layers:</p>
+        <pre><code>Reg32_3dDma::Reg32_3dDma(vp::ComponentConf &amp;config)
+    : vp::Component(config),
+      fe(this, &amp;this-&gt;me),
+      me(this, &amp;this-&gt;fe, &amp;this-&gt;be),
+      be_axi_read(this, "axi_read", &amp;this-&gt;be),
+      be_axi_write(this, "axi_write", &amp;this-&gt;be),
+      be_tcdm_read(this, "tcdm_read", &amp;this-&gt;be),
+      be_tcdm_write(this, "tcdm_write", &amp;this-&gt;be),
+      be(this, &amp;this-&gt;me,
+         &amp;this-&gt;be_tcdm_read, &amp;this-&gt;be_tcdm_write,
+         &amp;this-&gt;be_axi_read, &amp;this-&gt;be_axi_write)
+{}</code></pre>
+
+        <div class="flow" aria-label="iDMA implementation layers">
+          <div class="box"><strong>Front end</strong><small>registers, tickets, events</small></div>
+          <div class="arrow">→</div>
+          <div class="box"><strong>3D middle end</strong><small>descriptor → lines</small></div>
+          <div class="arrow">→</div>
+          <div class="box"><strong>Generic backend</strong><small>line → legal bursts</small></div>
+          <div class="arrow">→</div>
+          <div class="box"><strong>TCDM / AXI</strong><small>actual IO requests</small></div>
+        </div>
+
+        <p>Requests and data move left-to-right. Acknowledgments move right-to-left. That reverse completion path is what eventually increments <code>DONE_ID</code>.</p>
+
+        <h3>The external ports</h3>
+        <table>
+          <thead><tr><th>Port</th><th>Direction from iDMA</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>ctrl_N</code></td><td>Slave</td><td>One independent register file for each core or peripheral requester.</td></tr>
+            <tr><td><code>event_N</code>, <code>event_pe_N</code></td><td>Master wire</td><td>Broadcasts a completion notification when a descriptor finishes.</td></tr>
+            <tr><td><code>tcdm_read</code>, <code>tcdm_write</code></td><td>Master IO</td><td>Reads or writes addresses inside the configured local-memory range.</td></tr>
+            <tr><td><code>axi_read</code>, <code>axi_write</code></td><td>Master IO</td><td>Reads or writes addresses outside the local-memory range.</td></tr>
+          </tbody>
+        </table>
+
+        <p>The wrapper convenience methods bind the read and write ports to the same external target:</p>
+        <pre><code>def o_AXI(self, itf):
+    self.itf_bind('axi_read', itf, signature='io')
+    self.itf_bind('axi_write', itf, signature='io')
+
+def o_TCDM(self, itf):
+    self.itf_bind('tcdm_read', itf, signature='io')
+    self.itf_bind('tcdm_write', itf, signature='io')</code></pre>
+
+        <h3>What each configuration parameter really controls</h3>
+        <table>
+          <thead><tr><th>Parameter</th><th>Where it matters</th></tr></thead>
+          <tbody>
+            <tr><td><code>nb_cores</code> + <code>nb_pe_ports</code></td><td>How many independent <code>ctrl_N</code> register files and completion-event outputs are created.</td></tr>
+            <tr><td><code>nb_streams</code></td><td>How many shared sets of <code>STATUS</code>, <code>NEXT_ID</code>, and <code>DONE_ID</code> counters exist.</td></tr>
+            <tr><td><code>multireg_count</code></td><td>The reserved width of each generated status multireg. It determines the offsets of <code>NEXT_ID</code> and <code>DONE_ID</code>.</td></tr>
+            <tr><td><code>global_queue_depth</code></td><td>Maximum number of accepted descriptors waiting in the front end to enter the middle end.</td></tr>
+            <tr><td><code>transfer_queue_size</code></td><td>Maximum descriptors queued in the 3D middle end.</td></tr>
+            <tr><td><code>burst_queue_size</code></td><td>Number of logical burst slots in each AXI backend and queue capacity in each TCDM backend.</td></tr>
+            <tr><td><code>burst_size</code></td><td>Optional maximum AXI burst size. Zero means no extra cap beyond the model's 4 KiB/page rule.</td></tr>
+            <tr><td><code>loc_base</code>, <code>loc_size</code></td><td>Define the address range routed to TCDM. Everything else uses AXI.</td></tr>
+            <tr><td><code>tcdm_width</code></td><td>Maximum bytes transferred by one TCDM line request.</td></tr>
+          </tbody>
+        </table>
+
+        <div class="callout blue">
+          <p>There are several different queue limits because they model different pipeline stages. A descriptor slot, middle-end queue entry, logical burst slot, and individual AXI write request are not the same object.</p>
+        </div>
+
+        <h3>The front end: registers become an <code>IdmaTransfer</code></h3>
+        <p>Each control port owns its own descriptor registers, so two cores can prepare descriptors without overwriting each other. Ticket counters belong to streams and are shared across ports.</p>
+        <table>
+          <thead><tr><th>Register</th><th>Offset in this test</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td><code>CONF</code></td><td><code>0x000</code></td><td>Selects dimensional behavior. The current model chooses TCDM versus AXI from addresses.</td></tr>
+            <tr><td><code>NEXT_ID[0]</code></td><td><code>0x00c</code></td><td><strong>Reading it launches</strong> the programmed descriptor and returns its ticket.</td></tr>
+            <tr><td><code>DONE_ID[0]</code></td><td><code>0x014</code></td><td>Returns the last completed ticket for stream 0.</td></tr>
+            <tr><td><code>DST_ADDR</code></td><td><code>0x0d0</code></td><td>Destination base address.</td></tr>
+            <tr><td><code>SRC_ADDR</code></td><td><code>0x0d8</code></td><td>Source base address.</td></tr>
+            <tr><td><code>LENGTH</code></td><td><code>0x0e0</code></td><td>Bytes in one contiguous line.</td></tr>
+            <tr><td>Stride/repetition registers</td><td><code>0x0e8</code>–<code>0x110</code></td><td>Describe the second and third dimensions.</td></tr>
+          </tbody>
+        </table>
+
+        <p>With <code>multireg_count=2</code>, the bases are calculated as follows:</p>
+        <pre><code>status_base  = 0x004
+next_id_base = status_base  + 4 * 2 = 0x00c
+done_id_base = next_id_base + 4 * 2 = 0x014</code></pre>
+
+        <p>This parameter must match the register package and software header. Other iDMA revisions reserve sixteen multireg entries and place these registers elsewhere.</p>
+
+        <p>On a <code>NEXT_ID</code> read, <code>enqueue_copy()</code> snapshots the port registers into a heap-allocated <code>IdmaTransfer</code>, assigns the stream's next ticket, increments the pending count, and queues the transfer. Tickets start at 1; <code>DONE_ID</code> starts at 0.</p>
+
+        <h3>The middle end: dimensions become line transfers</h3>
+        <p>The 3D middle end normalizes all shapes into the same loop:</p>
+        <ul>
+          <li>A 1D copy is one line in one page.</li>
+          <li>A 2D copy is several lines in one page, advancing by the second-dimension strides.</li>
+          <li>A 3D copy is several 2D pages, also advancing by the third-dimension strides.</li>
+        </ul>
+
+        <p>For every line it allocates a child <code>IdmaTransfer</code>, points <code>child-&gt;parent</code> at the original descriptor, and increments <code>parent-&gt;nb_bursts</code>. Once every line has been emitted, it sets <code>parent-&gt;bursts_sent = true</code>. The parent completes only when all child transfers have also been acknowledged.</p>
+
+        <h3>The generic backend: addresses choose protocols</h3>
+        <p><code>IDmaBe::get_be_consumer()</code> classifies a whole range as local only when it fits completely inside <code>[loc_base, loc_base + loc_size)</code>:</p>
+        <pre><code>bool is_loc = base &gt;= loc_base
+    &amp;&amp; base + size &lt;= loc_base + loc_size;
+
+return is_loc
+    ? (is_read ? loc_be_read : loc_be_write)
+    : (is_read ? ext_be_read : ext_be_write);</code></pre>
+
+        <p>It then asks both selected protocol backends for a legal burst size. The smaller answer wins. It queues a read burst at the source and a matching write burst at the destination. As source data arrives, <code>IDmaBe::write_data()</code> forwards it to the destination backend.</p>
+
+        <h3>The TCDM backend: a source of fixed-width chunks</h3>
+        <p>The TCDM backend splits a logical burst into aligned requests no wider than <code>tcdm_width</code>. In this test the width is 32 bytes, so a 48-byte line is read as 32 + 16 and a 64-byte line as 32 + 32. The fake TCDM answers synchronously, so these buffers immediately flow into the AXI write backend.</p>
+
+        <h3>The AXI write backend: two levels of request</h3>
+        <p>This distinction is essential to understanding the bug:</p>
+        <ol>
+          <li><strong>Logical burst descriptor:</strong> a statically allocated <code>IoReq</code> taken from <code>free_bursts</code>. It reserves capacity and stores the destination base and total remaining burst size.</li>
+          <li><strong>Data-chunk request:</strong> a dynamically allocated <code>IoReq</code> created for each chunk arriving from TCDM. This is the request actually sent through <code>axi_write</code>.</li>
+        </ol>
+
+        <p>Thus one 48-byte logical AXI burst can produce two externally visible writes of 32 and 16 bytes. The logical slot must remain occupied until both chunk responses have been received.</p>
+      </section>
+
+      <section id="journey">
+        <h2>3. One 48-byte descriptor's complete journey</h2>
+        <p>Follow the first test descriptor, which copies 48 bytes from <code>0x10000000</code> (local) to <code>0x20000000</code> (external).</p>
+        <ol>
+          <li><strong>The tester programs registers.</strong> It writes <code>CONF</code>, destination, source, and length through <code>ctrl_0</code>.</li>
+          <li><strong>A read launches it.</strong> Reading <code>NEXT_ID[0]</code> snapshots the registers and returns ticket 1.</li>
+          <li><strong>The front end queues a parent.</strong> It creates one parent <code>IdmaTransfer</code> and records stream 0 in its free-form <code>data</code> vector.</li>
+          <li><strong>The middle end emits one line child.</strong> This is a 1D descriptor, so the line child is also 48 bytes. The parent now has one outstanding child.</li>
+          <li><strong>The generic backend selects directions.</strong> Source is inside the local range, so it selects <code>tcdm_read</code>. Destination is outside it, so it selects <code>axi_write</code>.</li>
+          <li><strong>A logical AXI burst slot is reserved.</strong> The AXI backend queues a 48-byte descriptor in both its data-order queue and acknowledgment queue.</li>
+          <li><strong>TCDM supplies chunk A32.</strong> A synchronous 32-byte read buffer is passed to AXI, producing the first pending external write request.</li>
+          <li><strong>TCDM supplies chunk A16.</strong> The final 16 bytes produce a second pending external write request.</li>
+          <li><strong>The external target responds.</strong> For each response, AXI calls <code>be-&gt;ack_data(..., chunk_size)</code>, which reduces the child transfer's <code>ack_size</code>.</li>
+          <li><strong>The child completes.</strong> When <code>ack_size</code> becomes zero, the generic backend acknowledges the child to the middle end.</li>
+          <li><strong>The parent completes.</strong> The middle end decrements <code>parent-&gt;nb_bursts</code>. Because every child was sent and none remains, it acknowledges the parent to the front end.</li>
+          <li><strong>Software-visible completion advances.</strong> The front end increments <code>DONE_ID</code>, decrements the stream's pending count, deletes the parent, and broadcasts the event wire.</li>
+        </ol>
+
+        <div class="callout">
+          <p><strong>Important:</strong> bytes can already be present in destination memory before the descriptor is architecturally complete. Completion requires the AXI responses to propagate all the way back to the front end and advance <code>DONE_ID</code>.</p>
+        </div>
+      </section>
+
+      <section id="bug">
+        <h2>4. The former burst-accounting vulnerability and its fix</h2>
+        <p>The vulnerable AXI backend maintained a FIFO named <code>pending_bursts_ack</code> containing logical burst descriptors waiting for all their chunk responses. But a dynamic write request stored only its parent <code>IdmaTransfer</code>:</p>
+        <pre><code>req-&gt;arg_alloc();
+*req-&gt;arg_get(0) = (void *)transfer;</code></pre>
+
+        <p>It did <em>not</em> store which logical burst descriptor owned that request. When any write response arrived, <code>write_handle_req_end()</code> unconditionally charged its byte count to the front of the FIFO:</p>
+        <pre><code>vp::IoReq *burst = this-&gt;pending_bursts_ack.front();
+burst-&gt;set_size(burst-&gt;get_size() - req-&gt;get_size());
+
+if (burst-&gt;get_size() == 0)
+{
+    this-&gt;pending_bursts_ack.pop();
+    this-&gt;free_bursts.push(burst);
+}</code></pre>
+
+        <p>That logic is valid only if write responses arrive in exactly the same order as their requests. The IO-v1 asynchronous callback supplies the original request pointer, so out-of-order completion is observable—but the implementation throws away the request-to-logical-burst association it needs.</p>
+
+        <h3>How the test corrupts the FIFO accounting</h3>
+        <p>Call the 48-byte logical burst A and the 64-byte logical burst B. TCDM width 32 creates these requests:</p>
+        <pre><code>Request index:  0      1      2      3
+Request:       A32    A16    B32    B32
+Response order forced by test: 0, 2, 1, 3</code></pre>
+
+        <table>
+          <thead><tr><th>Response</th><th>What should happen</th><th>What the old code does</th></tr></thead>
+          <tbody>
+            <tr><td><code>A32</code></td><td>A has 16 bytes remaining.</td><td>Front is A; A becomes 16. Still correct.</td></tr>
+            <tr><td><code>B32</code></td><td>B has 32 bytes remaining.</td><td>Front is still A; subtracting 32 from unsigned 16 underflows to a huge value.</td></tr>
+            <tr><td><code>A16</code></td><td>A reaches zero and frees its slot.</td><td>A's corrupted huge counter is reduced, but never reaches zero.</td></tr>
+            <tr><td><code>B32</code></td><td>B reaches zero and frees its slot.</td><td>The code still charges A. B remains untouched behind it.</td></tr>
+          </tbody>
+        </table>
+
+        <p>The queue has two slots. A's slot is never freed because its counter underflowed; B's slot is never reached because A remains at the front. Both logical burst slots leak. The third descriptor cannot reserve an AXI burst, even though all four data writes have reached the fake destination memory.</p>
+
+        <div class="callout failure">
+          <p>This is why the observed state is <code>done_id=2, AXI requests=4</code>. The first two descriptors have produced all four external writes, but completion bookkeeping prevents the pipeline from freeing capacity for the third descriptor. The failure is progress/accounting, not necessarily destination-data corruption.</p>
+        </div>
+
+        <h3>The invariant restored by the fix</h3>
+        <p>Every AXI write response must decrement the remaining-byte count of the <strong>logical burst that created that particular request</strong>. The corrected model stores that association in a second request argument:</p>
+        <pre><code>// When emitting the AXI write request
+req-&gt;arg_alloc(2);
+*req-&gt;arg_get(0) = (void *)transfer;
+*req-&gt;arg_get(1) = (void *)burst;
+
+// When its response arrives
+vp::IoReq *burst = (vp::IoReq *)*req-&gt;arg_get(1);
+burst-&gt;set_size(burst-&gt;get_size() - req-&gt;get_size());</code></pre>
+
+        <p>The completed burst is returned directly to <code>free_bursts</code>; no ordered acknowledgment FIFO is needed. Initializing each dynamic request with <code>init()</code> also establishes a clean argument stack before the two private slots are reserved. Response order can now differ from request order without changing ownership.</p>
+      </section>
+
+      <section id="vocabulary">
+        <h2>5. GVSOC vocabulary needed to read the model</h2>
+        <table>
+          <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Engine</strong></td><td>The scheduler and runtime underneath every model. It advances simulated time and calls events.</td></tr>
+            <tr><td><strong>Component</strong></td><td>A named block in the simulated hierarchy. It may be a leaf with C++ behavior or a composite containing children.</td></tr>
+            <tr><td><strong>Primitive / leaf</strong></td><td>A Python wrapper associated with compiled C++ model code.</td></tr>
+            <tr><td><strong>Composite</strong></td><td>A Python component mainly used to instantiate and connect other components.</td></tr>
+            <tr><td><strong>System tree</strong></td><td>The hierarchy of component instances and their properties and bindings.</td></tr>
+            <tr><td><strong>Port / interface</strong></td><td>A typed connection point through which components call one another.</td></tr>
+            <tr><td><strong>Master</strong></td><td>The side that initiates an interface operation, such as an IO request or wire update.</td></tr>
+            <tr><td><strong>Slave</strong></td><td>The side whose callback handles an operation.</td></tr>
+            <tr><td><strong>Target</strong></td><td>The top-level Python entry point selected by <code>gvrun --target</code>. Do not confuse it with an IO “target” device.</td></tr>
+            <tr><td><strong>Runner</strong></td><td>Orchestration code that discovers a target, prepares its configuration, and invokes build/run commands.</td></tr>
+            <tr><td><strong>Testbench</strong></td><td>A component or small system that stimulates a device under test and checks its responses.</td></tr>
+            <tr><td><strong>Clock event</strong></td><td>A callback scheduled to run after some number of cycles.</td></tr>
+            <tr><td><strong>Virtual time</strong></td><td>Simulated time. A million simulated cycles need not take a million real clock periods.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="python">
+        <h2>6. The Python system tree</h2>
+        <p>A Python generator is declarative in spirit: it says what exists, how it is configured, and how it is wired. Its execution constructs an object tree that GVSOC turns into runtime configuration.</p>
+
+        <h3>A leaf wrapper</h3>
+        <p>The testbench wrapper in <code>test.py</code> associates a Python component with <code>test.cpp</code> and advertises its ports:</p>
+        <pre><code>class IDmaInterleavingTester(gvsoc.systree.Component):
+    def __init__(self, parent, name):
+        super().__init__(parent, name)
+        self.add_sources(['test.cpp'])
+
+    def o_CTRL(self, itf):
+        self.itf_bind('ctrl', itf, signature='io')
+
+    def i_AXI(self):
+        return gvsoc.systree.SlaveItf(self, 'axi', signature='io')</code></pre>
+
+        <p><code>add_sources</code> makes this a leaf backed by C++. The names <code>ctrl</code> and <code>axi</code> must exactly match the strings passed to <code>new_master_port</code> and <code>new_slave_port</code> in C++.</p>
+
+        <h3>A composite test system</h3>
+        <pre><code>class Testbench(gvsoc.systree.Component):
+    def __init__(self, parent, name=None):
+        super().__init__(parent, name)
+
+        clock = vp.clock_domain.Clock_domain(
+            self, 'clock', frequency=100_000_000)
+        idma = Reg32_3dDma(self, 'idma', burst_queue_size=2, ...)
+        tester = IDmaInterleavingTester(self, 'tester')
+
+        clock.o_CLOCK(idma.i_CLOCK())
+        clock.o_CLOCK(tester.i_CLOCK())
+        tester.o_CTRL(idma.i_CTRL(0))
+        idma.o_TCDM(tester.i_TCDM())
+        idma.o_AXI(tester.i_AXI())
+        idma.o_EVENT(0, tester.i_EVENT())</code></pre>
+
+        <p>This creates three siblings: a clock, the iDMA device under test, and the tester. The last four lines are the wires in the virtual schematic.</p>
+
+        <div class="flow" aria-label="iDMA testbench connections">
+          <div class="box"><strong>Clock</strong><small>drives both models</small></div>
+          <div class="arrow">→</div>
+          <div class="box"><strong>iDMA</strong><small>device under test</small></div>
+          <div class="arrow">⇄</div>
+          <div class="box"><strong>Tester</strong><small>register driver + fake memories</small></div>
+        </div>
+
+        <h3>Properties and constructor parameters</h3>
+        <p>Python constructor arguments normally become component properties. Those properties reach the compiled model through its configuration. This is how a single model can represent memories of different sizes or iDMA instances with different queue depths.</p>
+        <pre><code># Python wrapper
+self.add_properties({'size': size, 'width_bits': width_log2})
+
+// C++ model
+js::Config *config = this-&gt;get_js_config();
+this-&gt;size = config-&gt;get_child_int("size");</code></pre>
+
+        <div class="callout blue">
+          <p><strong>Useful reading rule:</strong> when you encounter a mysterious C++ configuration value, search its Python wrapper. When you encounter a Python port name, search the C++ constructor for the same string.</p>
+        </div>
+      </section>
+
+      <section id="cpp">
+        <h2>7. The C++ component model</h2>
+        <p>A behavioral leaf usually inherits from <code>vp::Component</code>. It owns state, interface objects, and events.</p>
+
+        <pre><code>class IDmaInterleavingTester : public vp::Component
+{
+public:
+    IDmaInterleavingTester(vp::ComponentConf &amp;config);
+    void reset(bool active) override;
+
+private:
+    static vp::IoReqStatus axi_req(vp::Block *, vp::IoReq *);
+    static void step_handler(vp::Block *, vp::ClockEvent *);
+
+    vp::IoMaster ctrl_itf;
+    vp::IoSlave axi_itf;
+    vp::ClockEvent step_event;
+};</code></pre>
+
+        <p>The constructor registers ports and attaches callbacks:</p>
+        <pre><code>IDmaInterleavingTester::IDmaInterleavingTester(vp::ComponentConf &amp;config)
+    : vp::Component(config),
+      step_event(this, &amp;IDmaInterleavingTester::step_handler)
+{
+    this-&gt;new_master_port("ctrl", &amp;this-&gt;ctrl_itf);
+
+    this-&gt;axi_itf.set_req_meth(&amp;IDmaInterleavingTester::axi_req);
+    this-&gt;new_slave_port("axi", &amp;this-&gt;axi_itf, this);
+}</code></pre>
+
+        <p>Callbacks are static because the interface needs a plain function entry point. GVSOC passes the owning block as the first argument; the callback casts it back:</p>
+        <pre><code>vp::IoReqStatus IDmaInterleavingTester::axi_req(
+    vp::Block *__this, vp::IoReq *req)
+{
+    auto *_this = (IDmaInterleavingTester *)__this;
+    // Use _this to access component state.
+}</code></pre>
+
+        <h3>The factory function</h3>
+        <p>Every loadable leaf exposes a C-linkage factory. The loader calls it to create the C++ instance:</p>
+        <pre><code>extern "C" vp::Component *gv_new(vp::ComponentConf &amp;config)
+{
+    return new IDmaInterleavingTester(config);
+}</code></pre>
+
+        <div class="callout warning">
+          <p>If the Python source is found and compiled but the runtime cannot instantiate it, check the factory, model build/install output, and whether the Python/C++ port names agree.</p>
+        </div>
+      </section>
+
+      <section id="interfaces">
+        <h2>8. Ports and interfaces</h2>
+        <p>Components never reach into each other's internal fields. They communicate through bindings between a master and a slave. Each binding has a <em>signature</em>: the operations and types allowed on it.</p>
+
+        <table>
+          <thead><tr><th>Signature</th><th>Typical use</th><th>C++ pair</th></tr></thead>
+          <tbody>
+            <tr><td><code>io</code></td><td>Memory-mapped reads and writes</td><td><code>vp::IoMaster</code> → <code>vp::IoSlave</code></td></tr>
+            <tr><td><code>wire&lt;bool&gt;</code></td><td>State or event notification</td><td><code>vp::WireMaster&lt;bool&gt;</code> → <code>vp::WireSlave&lt;bool&gt;</code></td></tr>
+            <tr><td>clock</td><td>Associating components with a clock domain</td><td>Clock master → clock slave</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Direction is about who initiates</h3>
+        <p>The labels “input” and “output” can be misleading unless you ask: <em>who calls whom?</em></p>
+        <ul>
+          <li>The tester's <code>ctrl_itf</code> is a master because the tester initiates register requests to iDMA.</li>
+          <li>The tester's <code>tcdm_itf</code> is a slave because iDMA initiates reads from local memory.</li>
+          <li>The tester's <code>axi_itf</code> is a slave because iDMA initiates writes to AXI memory.</li>
+          <li>The tester's <code>event_itf</code> is a slave because iDMA emits completion notifications.</li>
+        </ul>
+
+        <h3>Python and C++ must describe the same interface</h3>
+        <table>
+          <thead><tr><th>Python</th><th>C++</th></tr></thead>
+          <tbody>
+            <tr><td><code>self.itf_bind('ctrl', itf, signature='io')</code></td><td><code>new_master_port("ctrl", &amp;ctrl_itf)</code></td></tr>
+            <tr><td><code>SlaveItf(self, 'axi', signature='io')</code></td><td><code>new_slave_port("axi", &amp;axi_itf, this)</code></td></tr>
+            <tr><td><code>SlaveItf(self, 'event', signature='wire&lt;bool&gt;')</code></td><td><code>new_slave_port("event", &amp;event_itf, this)</code></td></tr>
+          </tbody>
+        </table>
+
+        <p>A name mismatch, signature mismatch, missing callback, or master-to-master connection is a structural bug. It usually fails during generation, binding, or startup—not deep into the test.</p>
+      </section>
+
+      <section id="time">
+        <h2>9. Time, clocks, events, and reset</h2>
+        <p>GVSOC is event-driven. A model should do a bounded amount of work in a callback and schedule another event when work belongs in the future. It should not sleep in real time or spin in a polling loop.</p>
+
+        <h3>Clock events</h3>
+        <pre><code>// Declared as state
+vp::ClockEvent response_event;
+
+// Connected to its callback in the initializer list
+response_event(this, &amp;IDmaInterleavingTester::response_handler)
+
+// Run the callback one cycle from now
+this-&gt;response_event.enqueue(1);</code></pre>
+
+        <p><code>enqueue(N)</code> schedules the event after <code>N</code> cycles of the component's clock domain. <code>is_enqueued()</code> helps avoid accidentally scheduling the same event twice. <code>this-&gt;clock.get_cycles()</code> reports the current cycle count.</p>
+
+        <h3>Reset has two phases</h3>
+        <p>The framework calls <code>reset(true)</code> when reset is asserted and <code>reset(false)</code> when it is released. Models commonly clear state on assertion and start activity on release. The iDMA tester initializes its memory and starts its events after release:</p>
+        <pre><code>void IDmaInterleavingTester::reset(bool active)
+{
+    if (!active)
+    {
+        // Fill deterministic input memory.
+        ...
+        this-&gt;step_event.enqueue(1);
+        this-&gt;timeout_event.enqueue(200);
+    }
+}</code></pre>
+
+        <div class="callout">
+          <p>A timeout is part of a good test, not just a convenience. Without it, a deadlocked model can leave CI running indefinitely. A timeout should explain the last observed state.</p>
+        </div>
+      </section>
+
+      <section id="io">
+        <h2>10. Memory-mapped IO requests</h2>
+        <p>The iDMA model in this regression uses the legacy v1 IO protocol. New GVSOC models may use IO v2, so always check the included header and wrapper signature before copying a pattern.</p>
+
+        <h3>Building a request</h3>
+        <pre><code>vp::IoReq req;
+req.prepare();
+req.set_addr(offset);
+req.set_size(sizeof(value));
+req.set_is_write(is_write);
+req.set_data((uint8_t *)&amp;value);
+
+vp::IoReqStatus status = this-&gt;ctrl_itf.req(&amp;req);</code></pre>
+
+        <p>An <code>IoReq</code> describes an address, byte count, direction, and data buffer. The request travels through the bound master port and invokes the remote slave callback.</p>
+
+        <h3>The four important v1 outcomes</h3>
+        <table>
+          <thead><tr><th>Status</th><th>Meaning</th><th>What happens next</th></tr></thead>
+          <tbody>
+            <tr><td><code>IO_REQ_OK</code></td><td>Accepted and completed synchronously.</td><td>The caller can use read data or regard the write as complete immediately.</td></tr>
+            <tr><td><code>IO_REQ_INVALID</code></td><td>The request is not valid for this target.</td><td>The access fails synchronously.</td></tr>
+            <tr><td><code>IO_REQ_PENDING</code></td><td>Accepted, but completion will arrive later.</td><td>The slave retains the request pointer and eventually calls <code>resp(req)</code>.</td></tr>
+            <tr><td><code>IO_REQ_DENIED</code></td><td>Not granted yet, often because a queue is full.</td><td>The target later grants it through the v1 grant handshake.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Synchronous target</h3>
+        <p>The fake TCDM memory completes accesses inside its callback:</p>
+        <pre><code>if (req-&gt;get_is_write())
+    memcpy(&amp;local_memory[address], req-&gt;get_data(), size);
+else
+    memcpy(req-&gt;get_data(), &amp;local_memory[address], size);
+
+return vp::IO_REQ_OK;</code></pre>
+
+        <h3>Asynchronous target</h3>
+        <p>The fake AXI endpoint accepts the data but deliberately postpones acknowledgment:</p>
+        <pre><code>memcpy(&amp;axi_memory[address], req-&gt;get_data(), size);
+pending_responses.push_back(req);
+response_sent.push_back(false);
+response_event.enqueue(1);
+return vp::IO_REQ_PENDING;</code></pre>
+
+        <p>A later event completes one chosen request:</p>
+        <pre><code>vp::IoReq *req = pending_responses[index];
+response_sent[index] = true;
+req-&gt;get_resp_port()-&gt;resp(req);</code></pre>
+
+        <div class="callout failure">
+          <p><strong>Critical lifetime rule:</strong> after returning <code>PENDING</code>, the request and its data must remain valid until the response. After <code>resp(req)</code>, assume the initiator may immediately reuse or destroy it. Never respond twice.</p>
+        </div>
+
+        <h3>Latency is not the same as pending</h3>
+        <p>A synchronous target can add modeled latency to a request and still return <code>OK</code>. That tells the initiator how long the operation took in its timing model. <code>PENDING</code> is different: it means the response itself will arrive through a later callback.</p>
+      </section>
+
+      <section id="target-runner">
+        <h2>11. Targets and the gvrun runner</h2>
+        <p>The word <em>runner</em> is used loosely, so separate these three layers:</p>
+
+        <table>
+          <thead><tr><th>Layer</th><th>Responsibility</th></tr></thead>
+          <tbody>
+            <tr><td><code>class Target(gvsoc.runner.Target)</code></td><td>Declares the top model and the target's discoverable name.</td></tr>
+            <tr><td><code>gvrun</code></td><td>Finds the target, resolves options, generates configuration, and performs commands such as <code>build</code>, <code>run</code>, <code>tree</code>, or <code>diagram</code>.</td></tr>
+            <tr><td><code>gvtest</code></td><td>Runs collections of tests, handles build/run steps and resources, captures output, and applies checkers.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>The smallest target</h3>
+        <pre><code>class Target(gvsoc.runner.Target):
+    gapy_description = 'legacy iDMA reordered AXI completion regression test'
+    model = Testbench
+    name = 'test'</code></pre>
+
+        <p>When invoked with <code>--target=test</code> and a target directory containing this file, <code>gvrun</code> imports it and instantiates <code>Testbench</code>.</p>
+
+        <h3>Useful gvrun commands</h3>
+        <pre><code># Discover commands supported by this target
+gvrun --target=test --target-dir=... commands
+
+# Inspect the generated hierarchy and properties
+gvrun --target=test --target-dir=... tree --tree-format=all
+
+# Produce a Graphviz architecture diagram
+gvrun --target=test --target-dir=... diagram
+
+# Run using an explicit work directory
+gvrun --target=test --target-dir=... --work-dir=... run</code></pre>
+
+        <p>Targets can also expose <code>TargetParameter</code> values. They are useful when one topology supports several test cases or runtime configurations. Prefer separate tests when cases have meaningfully different structures or expected outcomes.</p>
+      </section>
+
+      <section id="tests">
+        <h2>12. Anatomy of this standalone model test</h2>
+        <p>A compact test directory generally has four jobs, often represented by these four files:</p>
+
+        <table>
+          <thead><tr><th>File</th><th>Question it answers</th></tr></thead>
+          <tbody>
+            <tr><td><code>test.py</code></td><td>Which models exist, how are they configured, and how are they connected?</td></tr>
+            <tr><td><code>test.cpp</code></td><td>What stimulus is sent, how does the fake environment behave, and what counts as success?</td></tr>
+            <tr><td><code>Makefile</code></td><td>How can this test be built and run through the common test machinery?</td></tr>
+            <tr><td><code>testset.cfg</code></td><td>How does the suite discover, schedule, and judge the test?</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Why this is a model-level test</h3>
+        <p>The failure lives in <code>IDmaBeAxi</code>, below MAGIA SDK software and FIFO APIs. Reproducing it with an application, CPU, complete chip, runtime, and real memory hierarchy would add many unrelated failure modes. This test replaces that environment with one small C++ component while preserving every public iDMA boundary involved in the bug:</p>
+        <ul>
+          <li>Register requests enter through <code>ctrl_0</code>.</li>
+          <li>Source bytes leave through <code>tcdm_read</code>.</li>
+          <li>Destination writes leave through <code>axi_write</code>.</li>
+          <li>Completion is observed through <code>DONE_ID</code> and the event port.</li>
+        </ul>
+
+        <p>The tester is therefore both the “software driver” and the “memory system” around the DUT:</p>
+        <div class="flow" aria-label="Roles in the standalone test">
+          <div class="box"><strong>Register driver</strong><small>programs descriptors</small></div>
+          <div class="arrow">→</div>
+          <div class="box"><strong>iDMA DUT</strong><small>moves and tracks data</small></div>
+          <div class="arrow">→</div>
+          <div class="box"><strong>Fake memories</strong><small>TCDM immediate; AXI reordered</small></div>
+        </div>
+
+        <h3>The port directions are deliberately reversed</h3>
+        <p>The DUT's control port is a slave, so the tester needs a control master. The DUT's memory ports are masters, so the tester exposes memory slaves. This is why the tester's Python wrapper has <code>o_CTRL()</code> but <code>i_TCDM()</code> and <code>i_AXI()</code>.</p>
+
+        <h3>Qualities of a strong regression</h3>
+        <ul class="checklist">
+          <li>Uses the device's public ports and registers instead of internal implementation fields.</li>
+          <li>Creates the smallest configuration that makes the bug deterministic.</li>
+          <li>Checks architectural behavior, not an incidental log line from inside the DUT.</li>
+          <li>Has a bounded timeout with useful failure context.</li>
+          <li>Returns process status 0 only on success.</li>
+          <li>Fails before the fix and passes after it.</li>
+          <li>Keeps unrelated SDK or application layers out of a model-level bug reproduction.</li>
+        </ul>
+      </section>
+
+      <section id="idma">
+        <h2>13. Walking through the iDMA regression</h2>
+        <p>The bug is not “DMA copies bad bytes.” It is bookkeeping corruption when asynchronous AXI write responses return in an order different from request issue order. The test therefore needs an AXI endpoint that can retain several requests and respond to them individually in a chosen order.</p>
+
+        <h3>The controlled setup</h3>
+        <ul>
+          <li>The local side is a synchronous byte array.</li>
+          <li>The AXI side accepts writes asynchronously.</li>
+          <li>The iDMA has only two burst slots, making leaked accounting visible quickly.</li>
+          <li>Three descriptors are submitted. The third proves the first two truly release their slots.</li>
+          <li>The test polls the public <code>DONE_ID</code> register and verifies copied data.</li>
+        </ul>
+
+        <h3>Why every <code>test.py</code> parameter was chosen</h3>
+        <table>
+          <thead><tr><th>Setting</th><th>Value</th><th>Reason</th></tr></thead>
+          <tbody>
+            <tr><td><code>nb_cores</code></td><td>1</td><td>Only one register requester and event output are needed.</td></tr>
+            <tr><td><code>nb_pe_ports</code></td><td>0</td><td>Peripheral programming ports are irrelevant to this backend bug.</td></tr>
+            <tr><td><code>nb_streams</code></td><td>1</td><td>A single ticket sequence makes <code>NEXT_ID</code>/<code>DONE_ID</code> unambiguous.</td></tr>
+            <tr><td><code>multireg_count</code></td><td>2</td><td>Matches the Chips-IT register layout: next ID at <code>0x00c</code>, done ID at <code>0x014</code>.</td></tr>
+            <tr><td><code>global_queue_depth</code></td><td>4</td><td>Lets all three descriptors pass the front-end queue.</td></tr>
+            <tr><td><code>transfer_queue_size</code></td><td>4</td><td>Avoids middle-end capacity becoming the reason descriptor 3 waits.</td></tr>
+            <tr><td><code>burst_queue_size</code></td><td>2</td><td>Makes two leaked AXI slots exhaust the backend deterministically.</td></tr>
+            <tr><td><code>burst_size</code></td><td>0</td><td>Does not add an artificial AXI burst cap; each 1D line remains one logical burst.</td></tr>
+            <tr><td><code>loc_base</code>/<code>loc_size</code></td><td><code>0x10000000</code>/<code>0x10000</code></td><td>Classifies the sources as TCDM while <code>0x20000000</code> destinations go to AXI.</td></tr>
+            <tr><td><code>tcdm_width</code></td><td>32</td><td>Splits 48 into 32+16 and 64 into 32+32, producing unequal interleaved chunks.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>The C++ testbench's state</h3>
+        <table>
+          <thead><tr><th>State</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>local_memory</code></td><td>64 KiB deterministic source bytes exposed as synchronous TCDM.</td></tr>
+            <tr><td><code>axi_memory</code></td><td>64 KiB destination initialized to <code>0xa5</code>, updated when AXI writes are accepted.</td></tr>
+            <tr><td><code>pending_responses</code></td><td>Stable list of AXI <code>IoReq*</code> objects retained after returning <code>PENDING</code>.</td></tr>
+            <tr><td><code>response_sent</code></td><td>Parallel flags preventing a response from being sent twice.</td></tr>
+            <tr><td><code>step_event</code></td><td>Submits descriptors and polls <code>DONE_ID</code> once per cycle.</td></tr>
+            <tr><td><code>response_event</code></td><td>Selects and completes one pending AXI write per cycle.</td></tr>
+            <tr><td><code>timeout_event</code></td><td>Turns lack of progress at cycle 200 into a clear failing exit.</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Reset starts three independent activities</h3>
+        <p>After reset deassertion, the source memory is filled with a reproducible byte pattern. The descriptor/polling FSM begins at cycle +1, and the deadline is armed for cycle +200. The response FSM is started lazily by the first AXI request, so it cannot run before there is something to acknowledge.</p>
+
+        <h3>How register programming imitates software</h3>
+        <pre><code>uint32_t IDmaInterleavingTester::submit(
+    uint32_t src_offset, uint32_t dst_offset, uint32_t size)
+{
+    write(IDMA_CONF, 0);                         // 1D
+    write(IDMA_DST, AXI_BASE + dst_offset);      // external
+    write(IDMA_SRC, LOCAL_BASE + src_offset);    // local
+    write(IDMA_LENGTH, size);
+    return read(IDMA_NEXT_ID);                   // launch + ticket
+}</code></pre>
+
+        <p>The actual helper uses legacy <code>IoReq</code> objects rather than the shorthand above. Its request is stack-allocated safely because the iDMA control front end always completes these 32-bit register accesses synchronously with <code>IO_REQ_OK</code>.</p>
+
+        <h3>The two fake memory behaviors</h3>
+        <div class="two-col">
+          <div class="card">
+            <span class="label">TCDM</span>
+            <strong>Synchronous source</strong>
+            <p>The iDMA has already subtracted <code>loc_base</code>, so the callback indexes directly into <code>local_memory</code>, copies bytes, and returns <code>IO_REQ_OK</code>.</p>
+          </div>
+          <div class="card">
+            <span class="label">AXI</span>
+            <strong>Asynchronous destination</strong>
+            <p>The callback copies data into <code>axi_memory</code>, retains the request, schedules the response event, and returns <code>IO_REQ_PENDING</code>.</p>
+          </div>
+        </div>
+
+        <p>Copying AXI data at acceptance while delaying the acknowledgment is intentional. It separates “the payload arrived” from “the DMA was told it completed,” which is exactly the distinction the faulty accounting loses.</p>
+
+        <h3>Why the sizes matter</h3>
+        <p>The first transfers are 48 and 64 bytes with a 32-byte transfer width. They become chunks:</p>
+        <pre><code>Issue order:     A32, A16, B32, B32
+Forced response: A32, B32, A16, B32</code></pre>
+
+        <p>The key is that A has a 16-byte tail while B has a 32-byte chunk. If an implementation attributes every response to only the oldest or last remembered burst, B's 32-byte response is charged to the wrong remaining count. Unequal sizes turn a vague ordering mistake into deterministic counter corruption.</p>
+
+        <h3>How response order is forced</h3>
+        <pre><code>static constexpr int forced_order[] = {0, 2, 1};
+if (forced_response_step &lt; 3)
+{
+    int index = forced_order[forced_response_step];
+    if (index &gt;= (int)pending_responses.size()) return -1;
+    forced_response_step++;
+    return index;
+}</code></pre>
+
+        <p>The callback waits until the requested index exists. It does not assume B's first request has already arrived. This makes the test deterministic even if model scheduling shifts slightly.</p>
+
+        <h3>Phase-by-phase execution</h3>
+        <table>
+          <thead><tr><th>Phase</th><th>Tester action</th><th>Expected iDMA effect</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Submit 48-byte A; verify returned ticket is 1.</td><td>Reserve logical burst A; issue A32 and A16.</td></tr>
+            <tr><td>2</td><td>Submit 64-byte B; verify ticket 2.</td><td>Reserve logical burst B; issue B32 and B32.</td></tr>
+            <tr><td>3</td><td>Submit 32-byte C; verify ticket 3.</td><td>C may wait upstream until an AXI burst slot becomes free.</td></tr>
+            <tr><td>4</td><td>Respond A32, then B32, then A16.</td><td>A and B accounting must follow request ownership, not response order.</td></tr>
+            <tr><td>5</td><td>Drain remaining responses and poll <code>DONE_ID</code>.</td><td>A and B release both slots; C runs; <code>DONE_ID</code> reaches 3.</td></tr>
+            <tr><td>6</td><td>Compare the three destination ranges.</td><td>Every byte matches its deterministic TCDM source.</td></tr>
+          </tbody>
+        </table>
+
+        <p>The exact cycles are intentionally not asserted. The test checks ordering and eventual progress without coupling itself to incidental internal scheduling latency.</p>
+
+        <h3>Why three descriptors are required</h3>
+        <p>A test that submits only the first two transfers could stop after observing that bytes reached memory. But the defect leaks burst slots. A third descriptor asks the stronger question: <em>did the previous transfers finish cleanly enough for the engine to continue?</em></p>
+
+        <h3>The architectural oracle</h3>
+        <pre><code>uint32_t done_id = 0;
+register_access(IDMA_DONE_ID, false, done_id);
+
+if (done_id &gt;= 3)
+{
+    check_result();
+    return;
+}</code></pre>
+
+        <p><code>DONE_ID</code> is the software-visible completion state. Requiring it to reach ticket 3 directly captures the reported failure: some sends never become done. Then <code>check_result()</code> verifies that every destination range matches its source.</p>
+
+        <h3>Why the event callback is empty</h3>
+        <p>The event port is bound so the DUT has its normal completion output, but <code>event_sync()</code> deliberately does not declare success. Events are broadcast notifications and do not carry a ticket. The test polls <code>DONE_ID</code> to prove which descriptor completed, just as software must consult architectural state.</p>
+
+        <h3>Every way the test can finish</h3>
+        <ul>
+          <li>A wrong or rejected ticket fails immediately.</li>
+          <li>A failed <code>DONE_ID</code> register read fails immediately.</li>
+          <li>Destination data mismatch fails after ticket 3 completes.</li>
+          <li>No ticket-3 progress by cycle 200 fails with the last done ID and AXI request count.</li>
+          <li>Only ticket 3 plus matching data prints the exact PASS line and calls <code>quit(0)</code>.</li>
+        </ul>
+
+        <h3>Red and green</h3>
+        <div class="two-col">
+          <div class="callout failure">
+            <p><strong>Before the fix</strong></p>
+            <pre><code>[200] tester FAIL timeout waiting for ticket 3
+(done_id=2, AXI requests=4)</code></pre>
+            <p>The deterministic failure is the desired “red” regression state.</p>
+          </div>
+          <div class="callout">
+            <p><strong>After the fix</strong></p>
+            <pre><code>[...] tester PASS done_id=3
+reordered_responses=1</code></pre>
+            <p>All tickets complete despite reordered responses, and all copied data matches.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="gvtest">
+        <h2>14. gvtest and testsets</h2>
+        <p><code>gvrun</code> runs one selected target. <code>gvtest</code> organizes many tests: it discovers testset files, runs their build and execution commands, limits shared resources, captures logs, and invokes checkers.</p>
+
+        <h3>The testset is executable Python</h3>
+        <pre><code>def testset_build(testset):
+    testset.set_name('idma')
+    testset.set_components(['pulp.idma.reg32_3d_dma'])
+
+    test = testset.new_make_test(
+        'axi_write_response_reordering',
+        checker=_check,
+        build_resource='gvsoc.core.build',
+        no_clean=True,
+    )</code></pre>
+
+        <p>The name identifies the suite and test. The component list helps classification and filtering. <code>new_make_test</code> tells gvtest to use the directory's Makefile.</p>
+
+        <h3>Why a checker exists when the process has an exit code</h3>
+        <p>A checker makes the expected semantic result explicit and catches cases such as an early exit, crash, or command that never ran the intended model.</p>
+        <pre><code>PASS_RX = re.compile(
+    r'^\[\d+\] tester PASS done_id=3 reordered_responses=1$',
+    re.MULTILINE)
+
+def _check(test, output, *args, **kwargs):
+    if PASS_RX.search(output):
+        return True, 'all three tickets completed'
+    ...
+    return False, 'no tester PASS / FAIL line in output'</code></pre>
+
+        <h3>Shared build resources</h3>
+        <p><code>build_resource='gvsoc.core.build'</code> prevents parallel tests from colliding while they update the same GVSOC build/install tree. <code>no_clean=True</code> avoids cleaning a shared build that other tests depend on. These are orchestration concerns, not simulated-hardware behavior.</p>
+
+        <h3>Suite discovery</h3>
+        <p>A parent <code>testset.cfg</code> imports child testsets. Adding the iDMA directory to the parent suite makes CI and developers discover it without knowing its exact path.</p>
+      </section>
+
+      <section id="workflow">
+        <h2>15. A working build–run–suite workflow</h2>
+
+        <h3>Build the model and test target</h3>
+        <p>In this embedded checkout, run the build from the actual GVSOC root and pass the test directory as a module root:</p>
+        <pre><code>cd /home/ivan/repos/magia-sdk-v3/gvsoc
+
+make TARGETS=test \
+  MODULES=/home/ivan/repos/magia-sdk-v3/gvsoc/pulp/tests/idma \
+  build</code></pre>
+
+        <p><code>TARGETS=test</code> selects the test target for generation. <code>MODULES=...</code> lets the build discover and compile the test's C++ source and import its Python generator.</p>
+
+        <h3>Run it directly</h3>
+        <pre><code>mkdir -p /tmp/gvsoc-idma-regression
+
+install/bin/gvrun \
+  --target-dir=/home/ivan/repos/magia-sdk-v3/gvsoc/pulp/tests/idma \
+  --target=test \
+  --work-dir=/tmp/gvsoc-idma-regression \
+  run</code></pre>
+
+        <p>The explicit work directory keeps generated runtime files away from source. While the vulnerability is present, an exit status of 1 and the ticket-3 timeout are expected. After the model fix, this same command must exit 0.</p>
+
+        <h3>Run through the suite</h3>
+        <p>The precise gvtest command depends on the environment setup used by this checkout. Ask the installed executable for its current options rather than relying on an old invocation:</p>
+        <pre><code>gvtest --help
+gvtest --testset /home/ivan/repos/magia-sdk-v3/gvsoc/pulp/tests/testset.cfg tests</code></pre>
+
+        <div class="callout warning">
+          <p>The small test Makefile assumes the usual standalone repository layout via <code>GVSOC_ROOT ?= ../../../..</code>. Here GVSOC is embedded inside a larger SDK, so that default may point at the SDK root instead of the GVSOC root. Override <code>GVSOC_ROOT</code> or use the verified root-level commands above.</p>
+        </div>
+
+        <h3>Read failures in layers</h3>
+        <ol>
+          <li><strong>Generation failure:</strong> Python imports, target discovery, properties, or bindings.</li>
+          <li><strong>Build failure:</strong> C++ syntax, includes, model discovery, linking, or installation.</li>
+          <li><strong>Startup failure:</strong> shared-library loading, factory symbol, port binding, or configuration.</li>
+          <li><strong>Behavioral failure:</strong> the model ran and the test's assertion or timeout fired.</li>
+          <li><strong>Suite-only failure:</strong> Makefile, checker, path discovery, environment, or resource orchestration.</li>
+        </ol>
+      </section>
+
+      <section id="debugging">
+        <h2>16. Debugging habits and common pitfalls</h2>
+
+        <h3>Inspect structure before behavior</h3>
+        <p>Use the <code>tree</code> command to verify component names, parameters, and hierarchy. Use <code>diagram</code> when bindings are hard to visualize. If the graph is wrong, no amount of C++ tracing will make the runtime behavior right.</p>
+
+        <h3>Print state that explains the failure</h3>
+        <p>A message like “timeout” is weak. The iDMA test reports the last <code>DONE_ID</code> and number of issued AXI requests. Those values distinguish “nothing started” from “two completed and the third starved.”</p>
+
+        <h3>Do not accidentally serialize an ordering test</h3>
+        <p>If a fake AXI target returns <code>OK</code>, every request completes during the call and there is no opportunity to reorder responses. To test interleaving, retain multiple requests with <code>PENDING</code>, then respond later in an intentional sequence.</p>
+
+        <h3>Watch ownership at asynchronous boundaries</h3>
+        <ul>
+          <li>Do not store a pointer to a stack request if the caller may return or reuse it.</li>
+          <li>Do not access a request after calling its response callback.</li>
+          <li>Track which requests have already received responses.</li>
+          <li>Do not confuse “data copied into fake memory” with “transaction acknowledged.”</li>
+        </ul>
+
+        <h3>Keep the oracle public</h3>
+        <p>Checking a private internal queue can make a test brittle and can accidentally encode the faulty implementation. Prefer registers, output interfaces, data memory, interrupt/event behavior, and the process exit status.</p>
+
+        <h3>Make scheduling assumptions explicit</h3>
+        <p>If the test needs request 2 before sending a response, check that it exists and retry next cycle. Never index a queue based solely on an assumed callback order.</p>
+
+        <h3>A quick pre-PR checklist</h3>
+        <ul class="checklist">
+          <li>The regression fails on the parent commit for the intended reason.</li>
+          <li>It passes with the fix repeatedly.</li>
+          <li>The direct command and suite command both work.</li>
+          <li>No application SDK is needed to trigger a model-level defect.</li>
+          <li>Comments explain why unusual sizes and ordering are necessary.</li>
+          <li>The timeout is long enough for a correct model and short enough for CI.</li>
+          <li>The test leaves generated artifacts outside the source directory where practical.</li>
+          <li>The parent testset imports the new child testset.</li>
+        </ul>
+      </section>
+
+      <section id="glossary">
+        <h2>17. Compact glossary</h2>
+        <dl>
+          <dt><strong>Binding</strong></dt><dd>A connection between compatible master and slave ports.</dd>
+          <dt><strong>DUT</strong></dt><dd>Device under test; here, the legacy register-programmed 3D iDMA.</dd>
+          <dt><strong>Elaboration</strong></dt><dd>Executing Python generators to construct and configure the system tree.</dd>
+          <dt><strong>FSM</strong></dt><dd>Finite-state machine; a common way to organize a component or testbench across events.</dd>
+          <dt><strong>Generator</strong></dt><dd>Python code that describes a target or component hierarchy.</dd>
+          <dt><strong>Oracle</strong></dt><dd>The rule a test uses to decide whether observed behavior is correct.</dd>
+          <dt><strong>Pending request</strong></dt><dd>An accepted IO request whose completion callback will happen later.</dd>
+          <dt><strong>Response interleaving</strong></dt><dd>Responses from different requests or bursts appearing in an order that is not simply the original issue order.</dd>
+          <dt><strong>Ticket / done ID</strong></dt><dd>Software-visible IDs used to identify submitted work and completed work.</dd>
+          <dt><strong>Work directory</strong></dt><dd>The directory where a run places generated configuration and runtime artifacts.</dd>
+        </dl>
+
+        <div class="callout blue">
+          <p><strong>If you remember only five things:</strong> Python builds the hierarchy; C++ implements behavior; masters initiate and slaves handle; pending IO requires a later response with careful lifetime management; and a good model regression tests public behavior with a deterministic timeout.</p>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <p>This guide is based on the GVSOC documentation and implementation present in this checkout, especially the component model, IO v1 interface guide, standalone-testbench tutorial, gvrun usage guide, gvtest specification, and the local iDMA regression files.</p>
+        <p>Local starting points: <code>engine/docs/developer_manual/component_model.rst</code>, <code>engine/docs/developer_manual/interfaces/io_v1.rst</code>, <code>engine/docs/developer_manual/tutorials.rst</code>, <code>engine/docs/user_manual/usage.rst</code>, and <code>gvtest/SPECIFICATIONS.md</code>.</p>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

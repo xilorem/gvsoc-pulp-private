@@ -69,12 +69,12 @@ class MagiaArch:
     USE_NEW_SPATZ              = True
 
     # Pulp Cores
-    PULP_ENABLE         = True
+    PULP_ENABLE         = False
     NB_PULP_CORES       = 8
 
     # Tiles assignment
-    N_TILES_X           = 4
-    N_TILES_Y           = 4
+    N_TILES_X           = 32
+    N_TILES_Y           = 32
 
     ENABLE_PCIE_VFIO            = False
 
@@ -100,13 +100,17 @@ class MagiaTree(Tree):
 
 class MagiaDSE:
     SOC_L2_LATENCY              = 2
+    SOC_NOC_NI_OUTSTANDING_REQS = 16
+    SOC_NOC_ROUTER_INPUT_QUEUE_SIZE = 8
     TILE_ICACHE_REFILL_LATENCY  = 2
     TILE_TCDM_LATENCY           = 1
     TILE_AXI_XBAR_LATENCY       = 2
     TILE_AXI_XBAR_SYNC          = False
     TILE_OBI_XBAR_LATENCY       = 2
     TILE_OBI_XBAR_SYNC          = True
-    TILE_IDMA0_BQUEUE_SIZE      = 2
+    TILE_IDMA_GLOBAL_QUEUE_SIZE = 16
+    TILE_IDMA_TRANSFER_QUEUE_SIZE = 16
+    TILE_IDMA0_BQUEUE_SIZE      = 16
     TILE_IDMA0_B_SIZE           = 32
-    TILE_IDMA1_BQUEUE_SIZE      = 2
+    TILE_IDMA1_BQUEUE_SIZE      = 16
     TILE_IDMA1_B_SIZE           = 32
