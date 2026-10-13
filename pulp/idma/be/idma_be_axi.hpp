@@ -67,8 +67,8 @@ private:
     static void fsm_handler(vp::Block *__this, vp::ClockEvent *event);
     // Called when an asynchronous response is received from AXI
     static void axi_response(vp::Block *__this, vp::IoReq *req);
-    // Once a read burst is finished, it can be enqueued with this function so that it is
-    // notified after the latency has elapsed
+    // Mark a submitted read as ready once its response arrives, and account
+    // for the returned latency before forwarding it in submission order.
     void read_handle_req_end(vp::IoReq *req);
     // Called when a write requests is finish to handle it
     void write_handle_req_end(vp::IoReq *req);
@@ -91,14 +91,17 @@ private:
     // Available bursts. Bursts can be allocated until this queue is empty
     std::queue<vp::IoReq *> free_bursts;
 
-    // Bursts which received a response but are waiting proper timestamp to take into
-    // account the returned latency
+    // Read bursts in submission order. Responses may arrive out of order, but
+    // destination bursts were queued in submission order and must receive the
+    // matching data. Only a ready head can be forwarded after its latency.
     std::queue<vp::IoReq *> read_waiting_bursts;
     // Bursts sent to destination backend are enqueued here until they are acknowledged and
     // released
     std::queue<vp::IoReq *> read_bursts_waiting_ack;
     // List of timestamps for each burst where they can be considered as finished
     std::vector<int64_t> read_timestamps;
+    // Whether each outstanding read has received its response.
+    std::vector<bool> read_ready;
 
     // Queue of pending bursts. This contains both read and write bursts. This is mostly used
     // to process them in order. The front burst is removed from the queue once it is fully

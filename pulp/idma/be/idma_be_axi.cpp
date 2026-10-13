@@ -51,6 +51,7 @@ IDmaBeAxi::IDmaBeAxi(vp::Component *idma, std::string itf_name, IdmaBeProducer *
     // Use it to size the array of bursts and associated timestamps
     this->bursts.resize(burst_queue_size);
     this->read_timestamps.resize(burst_queue_size);
+    this->read_ready.resize(burst_queue_size, false);
 
     for (int i=0; i<burst_queue_size; i++)
     {
@@ -103,6 +104,7 @@ void IDmaBeAxi::reset(bool active)
             // Reserve one argument in each request, we'll use it to store the associated
             // transfer to properly report the request termination
             req.arg_alloc();
+            this->read_ready[req.id] = false;
             this->free_bursts.push(&req);
         }
 
@@ -192,6 +194,12 @@ void IDmaBeAxi::send_read_burst_to_axi()
     // Reinit timings
     req->prepare();
 
+    // The NoC may return later reads first. Preserve submission order here,
+    // rather than queueing responses by arrival: the destination backend has
+    // already queued the corresponding write bursts in this same order.
+    this->read_ready[req->id] = false;
+    this->read_waiting_bursts.push(req);
+
     // Send to AXI interface
     vp::IoReqStatus status = this->ico_itf.req(req);
 
@@ -220,8 +228,7 @@ void IDmaBeAxi::read_handle_req_end(vp::IoReq *req)
     // Remember at which timestamp the burst must be notified
     this->trace.msg(vp::Trace::LEVEL_TRACE, "Handling end of read request (req: %p, latency %d)\n", req, req->get_latency());
     this->read_timestamps[req->id] = this->clock.get_cycles() + req->get_latency();
-    // Queue the requests, they will be notified in order.
-    this->read_waiting_bursts.push(req);
+    this->read_ready[req->id] = true;
     // Enqueue fsm event at desired timestamp in case the event is not already enqueued before
     this->fsm_event.enqueue(std::max(req->get_latency(), (uint64_t)1));
 }
@@ -387,6 +394,7 @@ void IDmaBeAxi::fsm_handler(vp::Block *__this, vp::ClockEvent *event)
     // In case we have pending read bursts waiting for pushing data, only do it if the backend
     // is ready to accept the data in case the destination is not ready
     if (_this->read_waiting_bursts.size() != 0 &&
+        _this->read_ready[_this->read_waiting_bursts.front()->id] &&
         _this->be->is_ready_to_accept_data((IdmaTransfer *)*_this->read_waiting_bursts.front()->arg_get(0)))
     {
         vp::IoReq *req = _this->read_waiting_bursts.front();
